@@ -23,6 +23,7 @@
 [x] M7: local backfill command and non-destructive R2 workflow
 [x] M7: export round-trip, ordering/list-limit, and strict-gap tests
 [x] M7: README secrets, commands, and R2 layout documentation
+[x] M7: daily/summary export and workflow-YAML acceptance
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -57,5 +58,10 @@ ruff check/format and mypy passed.
 APXMIDP missing for curtailed periods 29–39. Command exited 0 and printed all
 three required views.
 
-Next up: M7 local export acceptance, workflow YAML/actionlint validation, then
-all final repository gates.
+2026-07-19 — M7 complete: daily export for 2026-07-10 validated and wrote 3
+curtailment BMUs / 5 company rows; allow-missing summary validated with 7 months
+(May and June complete; the other months partial). Strict-gap CLI test exits 1.
+Workflow YAML parsed successfully; actionlint was not installed and was skipped
+as permitted. Full suite passed 43 tests; ruff check/format and mypy passed.
+
+Next up: all milestones complete.
