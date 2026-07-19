@@ -85,7 +85,18 @@ class ElexonClient:
         )
         if not isinstance(data, list):
             raise ValueError("BMU reference response must be an array")
-        return [BmuRef.model_validate(item) for item in data]
+        references: list[BmuRef] = []
+        seen: set[str] = set()
+        for item in data:
+            if not isinstance(item, dict) or not isinstance(
+                bmu_id := item.get("elexonBmUnit"), str
+            ):
+                continue
+            if bmu_id in seen:
+                continue
+            seen.add(bmu_id)
+            references.append(BmuRef.model_validate(item))
+        return references
 
     def wastedwind_summary(self, year: int) -> WastedWindSummary:
         fetch_date = time_in_london().isoformat()

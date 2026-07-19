@@ -32,6 +32,19 @@ validation evidence for the constraint-cost tracker.
   `id = "1"`) whose `acceptanceId` and `bidOfferPairId` are null. `StackItem`
   therefore accepts null for those two fields, although SPEC §3.1 types them as
   integers. The records and their calculation fields are retained unchanged.
+  DuckDB primary-key columns cannot be null, so persistence maps those two null
+  identifiers to the reserved sentinel `-9223372036854775808`; no calculation
+  uses either identifier.
+- **2026-07-19 — BMU reference rows without an Elexon ID:** the live
+  `/reference/bmunits/all` response contains 89 rows with null
+  `elexonBmUnit`. They remain in the raw cache but are excluded from the typed
+  reference list because they cannot participate in the specified BMU join or
+  satisfy the `bmu_ref` primary key.
+- **2026-07-19 — duplicate BMU reference:** the live reference response
+  includes `T_WLNYO-4` twice. The rows are identical across all fields in SPEC
+  §3.2 and differ only in the ignored `eic` field. The raw cache retains both;
+  typed reference data deterministically retains the first row so
+  `elexonBmUnit` remains a valid primary key.
 
 ## Validation results
 
