@@ -10,10 +10,12 @@ from tracker.api import ElexonClient
 from tracker.config import EARLIEST_DATE
 from tracker.ingest import ingest_dates, refresh_reference
 from tracker.store import TrackerStore
+from tracker.validate import run_validation
 
 app = typer.Typer(help="Track Great Britain balancing-mechanism constraint costs.")
 RAW_DIR = Path("raw")
 DATABASE_PATH = Path("data/tracker.duckdb")
+WAIVER_PATH = Path("validation/waivers.yml")
 
 
 @app.callback()
@@ -84,6 +86,28 @@ def show(settlement_date: str = typer.Option(..., "--date")) -> None:
         f"turnup_volume={result.turnup_volume:.6f} "
         f"total_cost={result.total_cost:.6f}"
     )
+
+
+@app.command("validate")
+def validate_command(
+    year: int = typer.Option(..., "--year"),
+    month: int | None = typer.Option(None, "--month", min=1, max=12),
+) -> None:
+    """Compare complete stored months with wastedwind.energy."""
+    latest = today_in_london() - timedelta(days=2)
+    try:
+        with ElexonClient(RAW_DIR) as client, TrackerStore(DATABASE_PATH) as store:
+            report = run_validation(client, store, year, month, latest, WAIVER_PATH)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    for item in report.comparisons:
+        typer.echo(
+            f"{item.year}-{item.month:02d} {item.metric}: "
+            f"ours={item.ours:.6f} theirs={item.theirs:.6f} "
+            f"delta={item.deviation_pct:.6f}% {item.status}"
+        )
+    if not report.passed:
+        raise typer.Exit(1)
 
 
 def resolve_date_range(

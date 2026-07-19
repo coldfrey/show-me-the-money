@@ -37,6 +37,14 @@ class DailyResultRecord:
         )
 
 
+@dataclass(frozen=True)
+class MonthlyAggregate:
+    curtailment_cost: float
+    curtailment_volume: float
+    turnup_cost: float
+    turnup_volume: float
+
+
 class TrackerStore:
     """Own the tracker's single DuckDB database."""
 
@@ -253,3 +261,18 @@ class TrackerStore:
         ).fetchone()
         assert row is not None
         return int(row[0])
+
+    def monthly_aggregate(self, year: int, month: int) -> MonthlyAggregate:
+        row = self.connection.execute(
+            """
+            SELECT coalesce(sum(curtailment_cost), 0),
+                   coalesce(sum(curtailment_volume), 0),
+                   coalesce(sum(turnup_cost), 0),
+                   coalesce(sum(turnup_volume), 0)
+            FROM daily_results
+            WHERE year(date) = ? AND month(date) = ?
+            """,
+            [year, month],
+        ).fetchone()
+        assert row is not None
+        return MonthlyAggregate(*(float(value) for value in row))

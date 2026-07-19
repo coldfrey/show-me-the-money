@@ -8,6 +8,7 @@
 [x] M3: DuckDB schemas and transactional per-date replacement
 [x] M3: cache-aware ingest/show orchestration and validated date ranges
 [x] M3: zero-HTTP cached idempotency and date-bound tests
+[x] M4: complete-month validation, four metrics, waivers, and unit tests
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -25,4 +26,5 @@ curtailment £1,023.581667 / 70.108333 MWh, replacement £8,678.336989 /
 70.108333 MWh, total £9,701.918656. Cached re-ingest test reproduced all five
 calculated values and the 2-row fixture stack exactly with zero HTTP.
 
-Next up: M4 monthly validation harness and live May/June comparison.
+Next up: M4 live June then May backfill/validation; investigate any metric over
+2% exactly as specified before completing the milestone.
