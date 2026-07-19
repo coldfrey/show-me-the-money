@@ -8,15 +8,17 @@ R2 under `data/` (contract: SPEC.md §8 — `data/summary.json`,
 ## Local preview
 
 ```sh
-uv run python site/dev/make_dev_data.py   # regenerate site/data/ from data/tracker.duckdb
-python3 -m http.server 8787 -d site       # then open http://localhost:8787
+uv run python site/dev/build_site_data.py   # runs the engine's real exports -> site/data/
+python3 -m http.server 8787 -d site         # then open http://localhost:8787
 ```
 
-`site/data/` is generated and gitignored. `data/dates.json` is a dev-only
-manifest of available days; production works without it (the app probes daily
-files by date).
+`build_site_data.py` runs `tracker export` + `tracker export-summary` (the real
+§8 contract JSON, with genuine per-station/per-company attribution from Phase B)
+and stages `out/` into `site/data/`, plus a `dates.json` local-nav manifest.
 
-Note: until the engine's Phase B (M5) per-BMU attribution ships, the
-"paid to stop / paid to start" tables come from a best-effort preview
-aggregate in `dev/make_dev_data.py` and are badged "preview" in the UI.
-Daily and monthly headline figures are the engine's real computed numbers.
+`site/data/` is generated and gitignored. Production serves the engine's `out/`
+directory (synced to R2) at `/data/`; the app works without `dates.json` (it
+probes daily files by date).
+
+`dev/make_dev_data.py` is the retired preview generator (pre-M5 scaling
+aggregate), kept only for reference.
