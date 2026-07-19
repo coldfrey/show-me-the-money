@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methodology — Show Me The Money</title>
+<meta name="description" content="Full methodology: where every figure comes from, every calculation made, every known limitation. 100% transparent.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .method { max-width: 46rem; margin: 0 auto; padding: 2.5rem 0 1rem; }
+  .method h2 {
+    font-size: 1.7rem; font-weight: 750; font-style: italic;
+    border-bottom: 2px solid var(--ink);
+    padding: 2.2rem 0 .35rem; margin-bottom: .9rem;
+  }
+  .method h2 .no {
+    font-family: var(--mono); font-style: normal; font-weight: 500;
+    font-size: .95rem; color: var(--ink-soft); margin-right: .6rem;
+  }
+  .method p, .method li { font-size: .98rem; margin-bottom: .8rem; }
+  .method ul, .method ol { padding-left: 1.3rem; margin-bottom: .9rem; }
+  .method li { margin-bottom: .45rem; }
+  .formula {
+    font-family: var(--mono); font-size: .8rem; line-height: 1.7;
+    background: var(--paper-deep); border: 1px solid var(--rule);
+    border-left: 3px solid var(--ink);
+    padding: .9rem 1.1rem; margin: 0 0 .9rem; overflow-x: auto;
+    white-space: pre;
+  }
+  .aside {
+    font-style: italic; color: var(--ink-soft); font-size: .9rem;
+    border-left: 3px solid var(--rule); padding-left: 1rem;
+  }
+  .backlink {
+    display: inline-block; font-family: var(--mono); font-size: .75rem;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: var(--wind); margin-top: 1rem;
+  }
+  .method table { margin-bottom: 1rem; }
+  .method code { font-family: var(--mono); font-size: .85em; background: var(--paper-deep); padding: .05em .3em; }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="masthead reveal">
+  <div class="masthead-rule top"></div>
+  <p class="masthead-meta">
+    <span><a href="index.html" style="color:inherit">← Show Me The Money</a></span>
+    <span>Full disclosure</span>
+  </p>
+  <h1 class="masthead-title" style="font-size:clamp(2rem,6vw,3.6rem)">Methodology</h1>
+  <p class="masthead-sub">Every figure on this site can be traced to a public data point and a
+     calculation described on this page. If you find an error, we want to know.</p>
+  <div class="masthead-rule bottom"></div>
+</header>
+
+<main class="method reveal">
+
+  <h2><span class="no">01</span>Where the data comes from</h2>
+  <p>Everything is computed from <strong>Elexon's Insights (BMRS) open data API</strong> — the
+     official settlement data for Great Britain's Balancing Mechanism. No API key, no scraping,
+     no private sources. The primary dataset is the <em>settlement stack</em>:</p>
+  <div class="formula">GET data.elexon.co.uk/bmrs/api/v1/balancing/settlement/stack/all/bid/{date}/{period}
+GET data.elexon.co.uk/bmrs/api/v1/balancing/settlement/stack/all/offer/{date}/{period}</div>
+  <p>One row per accepted balancing action per settlement period (48 half-hour periods per day;
+     46 or 50 on clock-change days — we always request periods 1–50 and treat "not found" as
+     empty). Station identities and fuel types come from Elexon's BMU reference list
+     (<code>/reference/bmunits/all</code>). Every raw API response is archived unmodified, so
+     every number is reproducible offline from the archive.</p>
+
+  <h2><span class="no">02</span>What counts as a constraint action</h2>
+  <p>Elexon marks each action with an <code>soFlag</code>: "potentially taken for reasons other
+     than energy balancing" — in practice, transmission constraints. We count an action as a
+     constraint action if and only if it is SO-flagged. This is the same filter wastedwind.energy
+     uses. It is an imperfect indicator, and we treat it as such (see §07).</p>
+
+  <h2><span class="no">03</span>Curtailment — wind paid to stop</h2>
+  <p>Over a day's <strong>bid</strong> stack (offers to <em>reduce</em> output), we take rows where
+     the unit's fuel type is wind and the action is SO-flagged:</p>
+  <div class="formula">wind_bids   = bids where fuelType == "WIND" and soFlag
+cost (£)    = Σ originalPrice × volume     # negative price × negative volume ⇒ positive £
+volume (MWh)= |Σ volume|</div>
+  <p>Wind farms usually <em>charge</em> to turn down (negative bid price) because curtailment
+     costs them subsidy revenue — so the cost is usually positive. Some units bid at positive
+     prices, meaning they <em>refund</em> the system when turned down. Both are included as-is.
+     On days when refunds outweigh payments, daily curtailment cost is legitimately
+     <strong>negative</strong>.</p>
+  <p class="aside">We use <code>originalPrice × volume</code> — not the transmission-loss-adjusted
+     or post-settlement figures — because that is precisely what wastedwind.energy computes, and
+     Phase A of this project is a faithful replication for validation. Adjusted variants may be
+     added later as clearly-labelled alternates.</p>
+
+  <h2><span class="no">04</span>Replacement — gas paid to start</h2>
+  <p>Curtailed energy still has to be generated somewhere. For each settlement period in which
+     wind was curtailed, we walk the <strong>offer</strong> stack (offers to <em>increase</em>
+     output) and price the replacement volume:</p>
+  <ol>
+    <li>Candidates: every offer in the period not flagged as short-duration
+        (<code>cadlFlag</code>), all fuel types, SO-flagged or not.</li>
+    <li>Sort: non-SO-flagged offers first, then by ascending <code>sequenceNumber</code>
+        (stable sort — ties keep their published order).</li>
+    <li>Consume offers in that order until the consumed volume equals the period's curtailed
+        volume. The final offer is pro-rated so volumes match exactly. If the stack runs out,
+        we price only what exists — no extrapolation.</li>
+    <li>Replacement cost for the period = Σ <code>originalPrice × consumed volume</code>.</li>
+  </ol>
+  <p>The daily replacement cost is the sum over periods. This is a <em>replacement-cost
+     estimate</em>: "what was actually paid, in offer-stack order, for a volume equal to the
+     curtailed volume." It is not the same thing as "all payments to SO-flagged generators" —
+     we compute that separately (§06) and never mix the two.</p>
+
+  <h2><span class="no">05</span>The headline</h2>
+  <div class="formula">total constraint cost = curtailment cost + replacement cost</div>
+  <p>That sum is the "paid twice" figure: consumers fund both sides of the same megawatt-hour
+     through balancing charges on their bills. Monthly and yearly figures are plain sums of
+     daily figures. A month still in progress is marked partial.</p>
+
+  <h2><span class="no">06</span>Who got paid — attribution</h2>
+  <p>League tables attribute payments to stations and parent companies. Payments per station are
+     summed from SO-flagged actions (gross payment: Σ <code>originalPrice × volume</code>).
+     Stations map to parent companies via a published seed table of lead-party name matches
+     (SSE, RWE, Uniper, EDF, Ørsted, joint ventures like Seagreen = SSE&nbsp;/&nbsp;TotalEnergies,
+     and so on). Anything unmatched keeps its lead-party name and is marked unverified — we do
+     not guess ownership.</p>
+  <p class="aside">Tables currently badged <strong>preview</strong> use an interim aggregate:
+     rankings from the raw settlement stack, scaled to the day's verified totals. The final
+     per-station attribution (including signed refund rows) replaces them shortly; daily and
+     monthly headline figures are already final-methodology.</p>
+  <p>We report <em>gross</em> payment, not profit. A gas plant paid £80/MWh has fuel costs; the
+     premium-above-market framing is arguably fairer to generators but less transparent to
+     compute, so gross is the headline and alternates belong here in the methodology.</p>
+
+  <h2><span class="no">07</span>Validation — proving the numbers</h2>
+  <p>Phase A of this project replicates wastedwind.energy's published methodology — decompiled
+     from the site's own JavaScript bundle — line by line. We then compare our monthly aggregates
+     against their published summary figures for complete months, requiring agreement within
+     <strong>±2%</strong> on each of: curtailment cost, curtailment volume, replacement cost,
+     replacement volume. Divergences beyond that must be investigated and either fixed or
+     explained in a public waiver. We also sanity-check against Elexon's independent
+     settlement-cashflow endpoints.</p>
+
+  <h2><span class="no">08</span>Known limitations — read this bit</h2>
+  <ul>
+    <li><strong>Our number is a floor.</strong> BM settlement data only. Constraint actions taken
+        as bilateral trades or through the Local Constraint Market, and curtailment of embedded
+        (non-BM) wind, are invisible here. True constraint costs are higher.</li>
+    <li><strong>The SO-flag is imperfect.</strong> It can catch non-constraint actions and miss
+        constraint actions. We document it; we don't "correct" it.</li>
+    <li><strong>Recent data is provisional.</strong> Elexon revises settlement data for days
+        after the fact. The trailing week is re-fetched on every run; figures for the last day
+        or two can move.</li>
+    <li><strong>Data quirks are kept, not cleaned.</strong> Live settlement data contains
+        oddities — synthetic rows with null identifiers, occasional duplicate reference entries,
+        units with no fuel type (shown as UNKNOWN). Each is handled by a documented rule in the
+        engine's METHODOLOGY file rather than silently dropped.</li>
+    <li><strong>Batteries and negative prices are part of the story.</strong> Negative-priced
+        offers and positive-priced bids are included as-is, exactly as settled.</li>
+  </ul>
+
+  <h2><span class="no">09</span>Reproduce it yourself</h2>
+  <p>The entire pipeline — API client, calculations, validation harness, and this site — is a
+     single open codebase. Every raw API response is cached verbatim; every calculation is a pure
+     function of that cache; every day's JSON output is published. Pull the same public data and
+     you will get the same numbers.</p>
+  <p class="aside">Sources: <a href="https://bmrs.elexon.co.uk/api-documentation" rel="noopener">Elexon Insights API</a> ·
+     <a href="https://wastedwind.energy" rel="noopener">wastedwind.energy</a> (validation reference)</p>
+
+  <a class="backlink" href="index.html">← Back to the ledger</a>
+</main>
+
+<footer class="colophon reveal">
+  <div class="masthead-rule top"></div>
+  <p class="colophon-meta" style="padding-top:.8rem">
+    Source: Elexon Insights (BMRS) open data · validated against
+    <a href="https://wastedwind.energy" rel="noopener">wastedwind.energy</a>
+  </p>
+</footer>
+</body>
+</html>
