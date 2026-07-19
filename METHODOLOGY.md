@@ -53,4 +53,18 @@ validation evidence for the constraint-cost tracker.
 
 ## Validation results
 
-None yet.
+### 2026-07-19 — wastedwind.energy monthly replication
+
+No waivers were needed. Values below are fresh Elexon settlement-stack
+aggregates compared with the same-day wastedwind.energy summary API.
+
+| Month | Metric | Ours | Theirs | Absolute delta |
+|---|---|---:|---:|---:|
+| 2026-05 | bidCost | 10,250,812.402910 | 10,239,915.901660 | 0.106412% |
+| 2026-05 | bidVolumeMWh | 577,414.328564 | 576,680.536897 | 0.127244% |
+| 2026-05 | turnUpCost | 82,411,399.349244 | 82,312,435.899796 | 0.120229% |
+| 2026-05 | turnUpVolume | 570,779.876404 | 570,046.084738 | 0.128725% |
+| 2026-06 | bidCost | 20,443,572.767158 | 20,443,572.767158 | 0.000000% |
+| 2026-06 | bidVolumeMWh | 605,943.025167 | 605,943.025167 | 0.000000% |
+| 2026-06 | turnUpCost | 89,558,881.516572 | 89,576,953.407854 | 0.020175% |
+| 2026-06 | turnUpVolume | 600,075.795330 | 600,075.795330 | 0.000000% |

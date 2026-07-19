@@ -145,9 +145,7 @@ def main() -> None:
             },
             "total_cost_gbp": total,
         }
-        (OUT / "daily" / f"{d.isoformat()}.json").write_text(
-            json.dumps(doc, indent=1)
-        )
+        (OUT / "daily" / f"{d.isoformat()}.json").write_text(json.dumps(doc, indent=1))
         dates.append(d.isoformat())
         m = months[d.month]
         m["curtailment_cost_gbp"] += c_cost
@@ -161,11 +159,19 @@ def main() -> None:
         for m, vals in sorted(months.items())
     ]
     totals = {
-        "curtailment_cost_gbp": round(sum(r["curtailment_cost_gbp"] for r in month_rows), 2),
-        "curtailment_volume_mwh": round(sum(r["curtailment_volume_mwh"] for r in month_rows), 2),
-        "replacement_cost_gbp": round(sum(r["replacement_cost_gbp"] for r in month_rows), 2),
+        "curtailment_cost_gbp": round(
+            sum(r["curtailment_cost_gbp"] for r in month_rows), 2
+        ),
+        "curtailment_volume_mwh": round(
+            sum(r["curtailment_volume_mwh"] for r in month_rows), 2
+        ),
+        "replacement_cost_gbp": round(
+            sum(r["replacement_cost_gbp"] for r in month_rows), 2
+        ),
         "total_cost_gbp": round(sum(r["total_cost_gbp"] for r in month_rows), 2),
-        "so_flagged_payments_gbp": round(sum(r["so_flagged_payments_gbp"] for r in month_rows), 2),
+        "so_flagged_payments_gbp": round(
+            sum(r["so_flagged_payments_gbp"] for r in month_rows), 2
+        ),
     }
     summary = {
         "generated_at": "dev-preview",

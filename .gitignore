@@ -1,6 +1,7 @@
 raw/
 out/
 data/*.duckdb
+data/*.duckdb.wal
 .venv/
 __pycache__/
 .pytest_cache/

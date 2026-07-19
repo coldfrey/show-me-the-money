@@ -37,8 +37,7 @@ def main() -> None:
                 rows += len(client.bid_stack(d, period))
                 rows += len(client.offer_stack(d, period))
             print(
-                f"{d.isoformat()} done: {rows} rows in "
-                f"{time.monotonic() - t0:.0f}s",
+                f"{d.isoformat()} done: {rows} rows in {time.monotonic() - t0:.0f}s",
                 flush=True,
             )
             d -= timedelta(days=1)

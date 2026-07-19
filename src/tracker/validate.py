@@ -9,7 +9,7 @@ from math import inf
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from tracker.api import ElexonClient
 from tracker.config import EARLIEST_DATE

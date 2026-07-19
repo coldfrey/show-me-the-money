@@ -10,6 +10,7 @@
 [x] M3: zero-HTTP cached idempotency and date-bound tests
 [x] M4: complete-month validation, four metrics, waivers, and unit tests
 [x] M4: preserve live null-BMU stack rows as unknown fuel
+[x] M4: live May and June wastedwind.energy validation
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -27,5 +28,10 @@ curtailment £1,023.581667 / 70.108333 MWh, replacement £8,678.336989 /
 70.108333 MWh, total £9,701.918656. Cached re-ingest test reproduced all five
 calculated values and the 2-row fixture stack exactly with zero HTTP.
 
-Next up: M4 live June then May backfill/validation; investigate any metric over
-2% exactly as specified before completing the milestone.
+2026-07-19 — M4 complete: live June deviations were bidCost 0.000000%,
+bidVolumeMWh 0.000000%, turnUpCost 0.020175%, turnUpVolume 0.000000%; live May
+deviations were 0.106412%, 0.127244%, 0.120229%, and 0.128725% respectively.
+Both commands exited 0 with no waivers; 6,200 May/June stack responses are
+cached for offline reproduction.
+
+Next up: M5 per-BMU attribution, owners seed, recompute, and leaderboard.
