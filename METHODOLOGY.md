@@ -24,6 +24,9 @@ validation evidence for the constraint-cost tracker.
   treated as stable.
 - Fuel types are enriched from Elexon's live BMU reference list. The reference
   site uses a bundled static list, so recently changed BMUs could differ.
+- Phase B gross SO-flagged offer payments intentionally do not apply a CADL
+  filter. This is distinct from replacement cost, whose stack walk excludes
+  CADL-flagged offers to match wastedwind.energy.
 
 ## Deviations
 

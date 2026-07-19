@@ -1,6 +1,7 @@
 """Command-line interface for the tracker."""
 
 from datetime import date, timedelta
+import json
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -8,7 +9,8 @@ import typer
 
 from tracker.api import ElexonClient
 from tracker.config import EARLIEST_DATE
-from tracker.ingest import ingest_dates, refresh_reference
+from tracker.ingest import ingest_dates, recompute_stored_dates, refresh_reference
+from tracker.owners import aggregate_leaderboard, load_owners, seed_owners
 from tracker.store import TrackerStore
 from tracker.validate import run_validation
 
@@ -16,6 +18,7 @@ app = typer.Typer(help="Track Great Britain balancing-mechanism constraint costs
 RAW_DIR = Path("raw")
 DATABASE_PATH = Path("data/tracker.duckdb")
 WAIVER_PATH = Path("validation/waivers.yml")
+OWNERS_PATH = Path("data/owners.csv")
 
 
 @app.callback()
@@ -108,6 +111,52 @@ def validate_command(
         )
     if not report.passed:
         raise typer.Exit(1)
+
+
+@app.command()
+def recompute(
+    settlement_date: str | None = typer.Option(None, "--date"),
+    from_date: str | None = typer.Option(None, "--from"),
+    to_date: str | None = typer.Option(None, "--to"),
+) -> None:
+    """Recompute stored dates without making HTTP requests."""
+    requested = resolve_date_range(settlement_date, from_date, to_date)
+    with TrackerStore(DATABASE_PATH) as store:
+        recomputed = recompute_stored_dates(store, requested[0], requested[-1])
+    typer.echo(f"Recomputed {len(recomputed)} stored dates with zero HTTP")
+
+
+@app.command("seed-owners")
+def seed_owners_command() -> None:
+    """Seed the top-30 owner map from May and June attribution."""
+    with TrackerStore(DATABASE_PATH) as store:
+        owners = seed_owners(store, OWNERS_PATH)
+    typer.echo(f"Wrote {len(owners)} owners to {OWNERS_PATH}")
+
+
+@app.command()
+def leaderboard(
+    from_date: str = typer.Option(..., "--from"),
+    to_date: str = typer.Option(..., "--to"),
+    side: str = typer.Option("turnup", "--side"),
+    by: str = typer.Option("station", "--by"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Aggregate per-BMU attribution by station or parent company."""
+    dates = resolve_date_range(None, from_date, to_date)
+    if side not in {"turnup", "curtailment"}:
+        raise typer.BadParameter("--side must be turnup or curtailment")
+    if by not in {"station", "company"}:
+        raise typer.BadParameter("--by must be station or company")
+    with TrackerStore(DATABASE_PATH) as store:
+        rows = store.attribution_rows(dates[0], dates[-1], side)  # type: ignore[arg-type]
+    output = aggregate_leaderboard(rows, by, load_owners(OWNERS_PATH))  # type: ignore[arg-type]
+    if as_json:
+        typer.echo(json.dumps(output, separators=(",", ":")))
+        return
+    for row in output:
+        name = row.get("parent_company", row.get("station_name"))
+        typer.echo(f"{name}: £{row['cost_gbp']:.2f}, {row['volume_mwh']:.2f} MWh")
 
 
 def resolve_date_range(
