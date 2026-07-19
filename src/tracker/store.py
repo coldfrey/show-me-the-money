@@ -311,10 +311,10 @@ class TrackerStore:
         fields = list(StackItem.model_fields)
         rows = self.connection.execute(
             """
-            SELECT settlementDate, settlementPeriod, startTime, sequenceNumber,
+            SELECT settlementDate, settlementPeriod, epoch_us(startTime), sequenceNumber,
                    id, acceptanceId, bidOfferPairId, cadlFlag, soFlag,
                    originalPrice, finalPrice, volume, transmissionLossMultiplier,
-                   createdDateTime, storProviderFlag, repricedIndicator,
+                   epoch_us(createdDateTime), storProviderFlag, repricedIndicator,
                    reserveScarcityPrice, dmatAdjustedVolume,
                    arbitrageAdjustedVolume, nivAdjustedVolume, parAdjustedVolume,
                    tlmAdjustedVolume, tlmAdjustedCost
@@ -327,6 +327,9 @@ class TrackerStore:
         items: list[StackItem] = []
         for row in rows:
             values = list(row)
+            values[2] = datetime.fromtimestamp(values[2] / 1_000_000, UTC)
+            if values[13] is not None:
+                values[13] = datetime.fromtimestamp(values[13] / 1_000_000, UTC)
             if values[4] == NULL_BMU_ID:
                 values[4] = None
             if values[5] == NULL_IDENTIFIER:

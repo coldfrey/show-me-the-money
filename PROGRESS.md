@@ -14,6 +14,7 @@
 [x] M5: pure SO offer/wind attribution and per-BMU DuckDB tables
 [x] M5: zero-HTTP recompute, deterministic owner mapping, and leaderboards
 [x] M5: attribution and owner-fallback unit tests
+[x] M5: dependency-free TIMESTAMPTZ round-trip for offline recompute
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.

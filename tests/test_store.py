@@ -146,3 +146,14 @@ def test_daily_result_round_trip(tmp_path) -> None:
     assert stored.date == SETTLEMENT_DATE
     assert stored.computed_at <= datetime.now(UTC).replace(tzinfo=None)
     assert stored.calculated_values == (100.0, 2.0, 200.0, 2.0, 300.0)
+
+
+def test_stack_items_round_trip_timestamps_without_optional_timezone_dependency(
+    tmp_path,
+) -> None:
+    bid = StackItem.model_validate(stack_item(flow="bid"))
+    with TrackerStore(tmp_path / "tracker.duckdb") as store:
+        store.replace_stack_items(SETTLEMENT_DATE, [bid], [])
+        restored = store.stack_items(SETTLEMENT_DATE, "bid")
+
+    assert restored == [bid]
