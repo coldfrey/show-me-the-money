@@ -1,0 +1,258 @@
+/* Show Me The Money — editorial ledger
+   Paper + ink broadsheet: Fraunces display, IBM Plex Mono figures.
+   Wind = petrol blue, gas = burnt amber, money = crimson. */
+
+:root {
+  --paper: #f5efe2;
+  --paper-deep: #ece3cf;
+  --ink: #1c1710;
+  --ink-soft: #5d5546;
+  --rule: #c9bda2;
+  --red: #a61b1b;
+  --wind: #1d5f74;
+  --gas: #b26a15;
+  --serif: "Fraunces", Georgia, serif;
+  --mono: "IBM Plex Mono", "Courier New", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-optical-sizing: auto;
+  line-height: 1.55;
+  min-height: 100vh;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+  max-width: 68rem;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* paper grain */
+.grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 40;
+  opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.5 0 0 0 0 0.42 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- reveal on load ---------- */
+.reveal { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+.reveal:nth-of-type(2) { animation-delay: .12s; }
+.reveal:nth-of-type(3) { animation-delay: .22s; }
+.reveal:nth-of-type(4) { animation-delay: .32s; }
+.reveal:nth-of-type(5) { animation-delay: .4s; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .bar-seg { animation: none !important; }
+}
+
+/* ---------- masthead ---------- */
+.masthead { padding-top: 2.2rem; text-align: center; }
+.masthead-rule { border-top: 3px double var(--ink); position: relative; }
+.masthead-rule.top::after {
+  content: ""; display: block; border-top: 1px solid var(--ink); margin-top: 3px;
+}
+.masthead-rule.bottom { border-top: 1px solid var(--ink); }
+.masthead-rule.bottom::after {
+  content: ""; display: block; border-top: 3px double var(--ink); margin-top: 3px;
+}
+.masthead-meta {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-soft);
+  padding: .55rem .1rem;
+}
+.masthead-title {
+  font-size: clamp(2.6rem, 8.5vw, 5.4rem);
+  font-weight: 850; line-height: .95;
+  letter-spacing: -.015em;
+  font-variation-settings: "opsz" 144;
+  text-transform: uppercase;
+  padding: .5rem 0 1rem;
+}
+.masthead-sub {
+  max-width: 40rem; margin: 0 auto;
+  font-style: italic; font-size: 1.06rem; color: var(--ink-soft);
+  padding-bottom: 1.1rem;
+}
+.masthead-sub em { color: var(--red); font-weight: 600; }
+
+/* ---------- headline counter ---------- */
+.headline {
+  position: relative; text-align: center;
+  padding: 3.2rem 0 2.4rem;
+}
+.headline-label {
+  font-family: var(--mono); font-size: .75rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink-soft);
+}
+.headline-figure {
+  font-family: var(--mono); font-weight: 600;
+  font-size: clamp(2.4rem, 9vw, 5.6rem);
+  color: var(--red); line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+.pound { font-size: .6em; vertical-align: .25em; margin-right: .06em; }
+
+.stamp {
+  position: absolute; top: 2.1rem; right: clamp(0rem, 6vw, 4rem);
+  transform: rotate(9deg);
+  font-family: var(--mono); font-weight: 600; font-size: .8rem;
+  letter-spacing: .3em; text-transform: uppercase;
+  color: var(--red); border: 2.5px solid var(--red);
+  border-radius: 4px; padding: .35em .7em .3em .9em;
+  opacity: .62;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='r'%3E%3CfeTurbulence baseFrequency='0.6' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 0.06'/%3E%3C/filter%3E%3Crect width='120' height='120' fill='%23000'/%3E%3Crect width='120' height='120' filter='url(%23r)'/%3E%3C/svg%3E");
+}
+
+.headline-split {
+  display: flex; justify-content: center; gap: clamp(1.5rem, 6vw, 5rem);
+  margin-top: 1.9rem; flex-wrap: wrap;
+}
+.split { min-width: 12rem; }
+.split dt {
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-soft);
+  padding-bottom: .25rem;
+}
+.split dd {
+  font-family: var(--mono); font-size: 1.5rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.split.wind dd { color: var(--wind); }
+.split.gas dd { color: var(--gas); }
+.split .split-sub {
+  font-size: .72rem; font-weight: 400; color: var(--ink-soft); padding-top: .1rem;
+}
+
+/* ---------- explainer ---------- */
+.explainer {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.4rem;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 1.7rem .2rem;
+  margin-bottom: 3rem;
+}
+.explainer-step { display: flex; gap: .8rem; align-items: baseline; }
+.explainer-no {
+  font-family: var(--mono); font-size: 1.5rem; font-weight: 600;
+  color: var(--rule);
+}
+.explainer-step p { font-size: .95rem; }
+.ink-wind { color: var(--wind); }
+.ink-gas { color: var(--gas); }
+.ink-red { color: var(--red); }
+
+/* ---------- panels ---------- */
+.panel { margin-bottom: 3.4rem; }
+.panel-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  flex-wrap: wrap; gap: .6rem;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: .4rem; margin-bottom: 1.2rem;
+}
+.panel-head h2 {
+  font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 750; font-style: italic;
+}
+.panel-legend { display: flex; gap: 1.2rem; font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; }
+.key::before {
+  content: ""; display: inline-block; width: .75em; height: .75em;
+  margin-right: .45em; border: 1px solid var(--ink);
+}
+.key.wind::before { background: var(--wind); }
+.key.gas::before { background: var(--gas); }
+
+/* ---------- chart ---------- */
+.chart { width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--mono); fill: var(--ink-soft); }
+.bar-seg { transform-origin: bottom; animation: grow .7s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes grow { from { transform: scaleY(0); } }
+.bar-wind { fill: var(--wind); }
+.bar-gas { fill: var(--gas); }
+.bar-seg:hover { filter: brightness(1.15); }
+.chart .baseline { stroke: var(--ink); stroke-width: 2; }
+.chart .gridline { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+.bar-label { font-weight: 600; }
+.chart-tip {
+  position: fixed; z-index: 50; pointer-events: none;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono); font-size: .72rem; line-height: 1.5;
+  padding: .5em .7em; border-radius: 2px;
+  transform: translate(-50%, calc(-100% - 10px));
+  white-space: pre; display: none;
+}
+
+/* ---------- daily ledger ---------- */
+.datenav { display: flex; gap: .4rem; align-items: center; }
+.datenav button {
+  font-family: var(--mono); font-size: 1rem;
+  background: none; border: 1.5px solid var(--ink); color: var(--ink);
+  width: 2.1rem; height: 2.1rem; cursor: pointer; border-radius: 2px;
+  transition: background .15s, color .15s;
+}
+.datenav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+.datenav button:disabled { opacity: .3; cursor: default; }
+.datenav input {
+  font-family: var(--mono); font-size: .85rem;
+  background: var(--paper-deep); color: var(--ink);
+  border: 1.5px solid var(--ink); border-radius: 2px;
+  padding: .35em .5em;
+}
+
+.daily-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-bottom: 1.6rem;
+}
+.dstat { background: var(--paper); padding: .8rem 1rem; }
+.dstat-label {
+  display: block; font-family: var(--mono); font-size: .64rem;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-soft);
+  padding-bottom: .2rem;
+}
+.dstat-val {
+  font-family: var(--mono); font-size: 1.25rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 2.2rem; }
+.tablewrap h3 {
+  font-style: italic; font-weight: 650; font-size: 1.1rem;
+  padding-bottom: .45rem;
+}
+.badge {
+  font-family: var(--mono); font-style: normal; font-weight: 500;
+  font-size: .58rem; letter-spacing: .12em; text-transform: uppercase;
+  border: 1px solid var(--ink-soft); color: var(--ink-soft);
+  border-radius: 2px; padding: .15em .45em; vertical-align: .25em;
+  cursor: help;
+}
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th {
+  font-family: var(--mono); font-size: .62rem; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft);
+  text-align: left; border-bottom: 1.5px solid var(--ink);
+  padding: .3rem .4rem;
+}
+tbody td { padding: .42rem .4rem; border-bottom: 1px dotted var(--rule); }
+tbody tr:hover { background: var(--paper-deep); }
+td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td .sub { display: block; font-family: var(--mono); font-size: .62rem; color: var(--ink-soft); }
+.empty { font-style: italic; color: var(--ink-soft); padding: 1.5rem 0; }
+
+/* ---------- colophon ---------- */
+.colophon { padding: 0 0 2.8rem; }
+.colophon-limits {
+  font-size: .82rem; font-style: italic; color: var(--ink-soft);
+  max-width: 46rem; padding: 1rem 0 .5rem;
+}
+.colophon-meta { font-family: var(--mono); font-size: .68rem; color: var(--ink-soft); }
+.colophon a { color: var(--wind); }

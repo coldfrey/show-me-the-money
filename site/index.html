@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Show Me The Money — GB Constraint Cost Tracker</title>
+<meta name="description" content="Tracking what Great Britain pays to waste wind: curtailment payments to wind farms and replacement payments to gas, from Elexon Balancing Mechanism settlement data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="masthead reveal">
+  <div class="masthead-rule top"></div>
+  <p class="masthead-meta">
+    <span>Great Britain · Balancing Mechanism</span>
+    <span class="masthead-date" id="masthead-date">—</span>
+  </p>
+  <h1 class="masthead-title">Show&nbsp;Me the&nbsp;Money</h1>
+  <p class="masthead-sub">A public ledger of what Great Britain pays to <em>waste wind</em> —
+     wind farms paid to switch off, gas plants paid to switch on, consumers billed for both.</p>
+  <div class="masthead-rule bottom"></div>
+</header>
+
+<main>
+  <!-- ============ HEADLINE COUNTER ============ -->
+  <section class="headline reveal" aria-labelledby="headline-label">
+    <p class="headline-label" id="headline-label">Constraint costs, <span id="headline-year">2026</span> to date</p>
+    <p class="headline-figure"><span class="pound">£</span><span id="ytd-counter" class="odometer">0</span></p>
+    <div class="stamp" aria-hidden="true">Paid&nbsp;Twice</div>
+    <dl class="headline-split">
+      <div class="split wind">
+        <dt>Wind paid to stop</dt>
+        <dd id="ytd-curtailment">—</dd>
+        <dd class="split-sub" id="ytd-volume">—</dd>
+      </div>
+      <div class="split gas">
+        <dt>Gas paid to start</dt>
+        <dd id="ytd-replacement">—</dd>
+        <dd class="split-sub">replacement energy</dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ============ EXPLAINER ============ -->
+  <section class="explainer reveal">
+    <div class="explainer-step">
+      <span class="explainer-no">01</span>
+      <p>Scotland's wind often exceeds what the grid can carry south. When a boundary binds, NESO pays wind farms to <strong class="ink-wind">turn down</strong>.</p>
+    </div>
+    <div class="explainer-step">
+      <span class="explainer-no">02</span>
+      <p>The lost energy still has to come from somewhere — so gas plants south of the constraint are paid to <strong class="ink-gas">turn up</strong>.</p>
+    </div>
+    <div class="explainer-step">
+      <span class="explainer-no">03</span>
+      <p>Both payments land on consumer bills. <strong class="ink-red">One curtailed megawatt-hour is paid for twice.</strong></p>
+    </div>
+  </section>
+
+  <!-- ============ MONTHLY CHART ============ -->
+  <section class="panel reveal" aria-labelledby="monthly-title">
+    <div class="panel-head">
+      <h2 id="monthly-title">The monthly bill</h2>
+      <p class="panel-legend">
+        <span class="key wind">wind curtailment</span>
+        <span class="key gas">gas replacement</span>
+      </p>
+    </div>
+    <div id="monthly-chart" class="chart" role="img" aria-label="Monthly constraint costs, stacked bars of curtailment and replacement"></div>
+  </section>
+
+  <!-- ============ DAILY LEDGER ============ -->
+  <section class="panel reveal" aria-labelledby="daily-title">
+    <div class="panel-head">
+      <h2 id="daily-title">Daily ledger</h2>
+      <nav class="datenav" aria-label="Choose date">
+        <button id="prev-day" aria-label="Previous day">←</button>
+        <input type="date" id="date-input" aria-label="Date">
+        <button id="next-day" aria-label="Next day">→</button>
+      </nav>
+    </div>
+
+    <div id="daily-body">
+      <div class="daily-stats">
+        <div class="dstat"><span class="dstat-label">Total</span><span class="dstat-val ink-red" id="d-total">—</span></div>
+        <div class="dstat"><span class="dstat-label">Curtailment</span><span class="dstat-val ink-wind" id="d-curt">—</span></div>
+        <div class="dstat"><span class="dstat-label">Replacement</span><span class="dstat-val ink-gas" id="d-repl">—</span></div>
+        <div class="dstat"><span class="dstat-label">Wind curtailed</span><span class="dstat-val" id="d-vol">—</span></div>
+      </div>
+
+      <div class="tables">
+        <div class="tablewrap">
+          <h3>Paid to stop <span class="badge" title="Attribution preview: exact per-station methodology ships with Phase B of the engine.">preview</span></h3>
+          <table>
+            <thead><tr><th>Wind farm</th><th class="num">£</th><th class="num">MWh</th></tr></thead>
+            <tbody id="tbl-bmus"></tbody>
+          </table>
+        </div>
+        <div class="tablewrap">
+          <h3>Paid to start <span class="badge" title="Attribution preview: exact per-company methodology ships with Phase B of the engine.">preview</span></h3>
+          <table>
+            <thead><tr><th>Company</th><th class="num">£</th><th class="num">MWh</th></tr></thead>
+            <tbody id="tbl-companies"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p id="daily-empty" class="empty" hidden>No settled data for this date.</p>
+  </section>
+</main>
+
+<footer class="colophon reveal">
+  <div class="masthead-rule top"></div>
+  <p id="limitations" class="colophon-limits"></p>
+  <p class="colophon-meta">
+    Source: Elexon Insights (BMRS) open data · methodology v<span id="methodology-version">1.0</span> ·
+    validated against <a href="https://wastedwind.energy" rel="noopener">wastedwind.energy</a> ·
+    <span id="generated-at"></span>
+  </p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
