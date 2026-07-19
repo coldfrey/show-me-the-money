@@ -45,6 +45,11 @@ validation evidence for the constraint-cost tracker.
   §3.2 and differ only in the ignored `eic` field. The raw cache retains both;
   typed reference data deterministically retains the first row so
   `elexonBmUnit` remains a valid primary key.
+- **2026-07-19 — null settlement-stack BMU IDs:** live stack data includes
+  occasional rows with null `id` (first observed on 2026-06-01 period 40).
+  They remain in calculation input with unknown fuel; this excludes them from
+  wind curtailment while retaining them in the all-fuel offer walk. Persistence
+  maps null to the reserved primary-key value `__NULL_BMU__`.
 
 ## Validation results
 

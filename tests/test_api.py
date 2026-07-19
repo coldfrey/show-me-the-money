@@ -85,6 +85,18 @@ def test_synthetic_stack_item_allows_null_identifiers(tmp_path) -> None:
     assert result[0].bidOfferPairId is None
 
 
+def test_stack_item_allows_null_bmu_id(tmp_path) -> None:
+    item = stack_item(1)
+    item["id"] = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [item]})
+
+    with ElexonClient(tmp_path, httpx.MockTransport(handler)) as client:
+        result = client.bid_stack(date(2026, 7, 10), 1)
+    assert result[0].id is None
+
+
 def test_reference_rows_without_elexon_id_are_not_joinable(tmp_path) -> None:
     valid = {
         "elexonBmUnit": "T_TEST-1",

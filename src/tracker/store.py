@@ -14,6 +14,7 @@ from tracker.wastedwind import DayResult
 
 Flow = Literal["bid", "offer"]
 NULL_IDENTIFIER = -(2**63)
+NULL_BMU_ID = "__NULL_BMU__"
 
 
 @dataclass(frozen=True)
@@ -164,7 +165,7 @@ class TrackerStore:
             item.startTime,
             item.createdDateTime,
             item.sequenceNumber,
-            item.id,
+            item.id if item.id is not None else NULL_BMU_ID,
             item.acceptanceId if item.acceptanceId is not None else NULL_IDENTIFIER,
             item.bidOfferPairId if item.bidOfferPairId is not None else NULL_IDENTIFIER,
             item.cadlFlag,

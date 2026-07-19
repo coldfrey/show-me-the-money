@@ -9,6 +9,7 @@
 [x] M3: cache-aware ingest/show orchestration and validated date ranges
 [x] M3: zero-HTTP cached idempotency and date-bound tests
 [x] M4: complete-month validation, four metrics, waivers, and unit tests
+[x] M4: preserve live null-BMU stack rows as unknown fuel
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.

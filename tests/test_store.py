@@ -6,13 +6,15 @@ import httpx
 from tracker.api import ElexonClient
 from tracker.ingest import ingest_dates
 from tracker.models import StackItem
-from tracker.store import NULL_IDENTIFIER, TrackerStore
+from tracker.store import NULL_BMU_ID, NULL_IDENTIFIER, TrackerStore
 
 
 SETTLEMENT_DATE = date(2026, 7, 10)
 
 
-def stack_item(*, flow: str, null_ids: bool = False) -> dict[str, object]:
+def stack_item(
+    *, flow: str, null_ids: bool = False, null_bmu_id: bool = False
+) -> dict[str, object]:
     volume = -2.0 if flow == "bid" else 2.0
     price = -50.0 if flow == "bid" else 100.0
     return {
@@ -20,7 +22,7 @@ def stack_item(*, flow: str, null_ids: bool = False) -> dict[str, object]:
         "settlementPeriod": 1,
         "startTime": "2026-07-09T23:00:00Z",
         "sequenceNumber": 1,
-        "id": "T_WIND-1" if flow == "bid" else "T_GAS-1",
+        "id": None if null_bmu_id else ("T_WIND-1" if flow == "bid" else "T_GAS-1"),
         "acceptanceId": None if null_ids else 1,
         "bidOfferPairId": None if null_ids else 1,
         "cadlFlag": None,
@@ -89,14 +91,16 @@ def seed_cache(cache_dir, client: ElexonClient) -> None:
 
 def test_per_date_stack_replace_is_transactional_and_replacing(tmp_path) -> None:
     bid = StackItem.model_validate(stack_item(flow="bid"))
-    nullable = StackItem.model_validate(stack_item(flow="offer", null_ids=True))
+    nullable = StackItem.model_validate(
+        stack_item(flow="offer", null_ids=True, null_bmu_id=True)
+    )
     with TrackerStore(tmp_path / "tracker.duckdb") as store:
         store.replace_stack_items(SETTLEMENT_DATE, [bid], [nullable])
         assert store.stack_item_count(SETTLEMENT_DATE) == 2
         stored_ids = store.connection.execute(
-            "SELECT acceptanceId, bidOfferPairId FROM stack_items WHERE id = 'T_GAS-1'"
+            "SELECT id, acceptanceId, bidOfferPairId FROM stack_items WHERE flow = 'offer'"
         ).fetchone()
-        assert stored_ids == (NULL_IDENTIFIER, NULL_IDENTIFIER)
+        assert stored_ids == (NULL_BMU_ID, NULL_IDENTIFIER, NULL_IDENTIFIER)
 
         store.replace_stack_items(SETTLEMENT_DATE, [bid], [])
         assert store.stack_item_count(SETTLEMENT_DATE) == 1

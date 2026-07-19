@@ -33,7 +33,9 @@ def daily_curtailment(
 ) -> CurtailmentResult:
     """Calculate SO-flagged wind curtailment from a day's bid stack."""
     wind_bids = [
-        item for item in bid_items if fuel_lookup.get(item.id) == "WIND" and item.soFlag
+        item
+        for item in bid_items
+        if item.id is not None and fuel_lookup.get(item.id) == "WIND" and item.soFlag
     ]
     period_totals: dict[int, float] = {}
     for item in wind_bids:

@@ -12,7 +12,7 @@ class StackItem(BaseModel):
     settlementPeriod: int
     startTime: datetime
     sequenceNumber: int
-    id: str
+    id: str | None
     acceptanceId: int | None
     bidOfferPairId: int | None
     cadlFlag: bool | None
