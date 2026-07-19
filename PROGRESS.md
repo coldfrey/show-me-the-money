@@ -15,6 +15,7 @@
 [x] M5: zero-HTTP recompute, deterministic owner mapping, and leaderboards
 [x] M5: attribution and owner-fallback unit tests
 [x] M5: dependency-free TIMESTAMPTZ round-trip for offline recompute
+[x] M5: backfill all stored attribution, seed top-30 owners, and accept leaderboard
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -38,5 +39,10 @@ deviations were 0.106412%, 0.127244%, 0.120229%, and 0.128725% respectively.
 Both commands exited 0 with no waivers; 6,200 May/June stack responses are
 cached for offline reproduction.
 
-Next up: M5 recompute all stored dates, seed `data/owners.csv`, and run the
-live deterministic leaderboard acceptance.
+2026-07-19 — M5 complete: recomputed 62 stored dates with zero HTTP and seeded
+30 owner rows from 2026-05-01..2026-06-30. June turn-up/company JSON returned
+87 rows sorted by cost descending, total £127,193,304.866889, top company
+Seabank Power Limited. Five attribution tests and full 35-test suite passed;
+ruff check/format and mypy passed.
+
+Next up: M6 optional EBOCF/MID cross-check for 2026-07-10.
