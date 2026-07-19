@@ -19,6 +19,10 @@
 [x] M6: EBOCF wind cashflow and APXMIDP alternative cross-check implementation
 [x] M6: period-404, sign/magnitude, zero-case, and missing-MID tests
 [x] M6: live 2026-07-10 cross-check and observed-sign record
+[x] M7: frozen-schema daily/summary exports and completeness guard
+[x] M7: local backfill command and non-destructive R2 workflow
+[x] M7: export round-trip, ordering/list-limit, and strict-gap tests
+[x] M7: README secrets, commands, and R2 layout documentation
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -53,4 +57,5 @@ ruff check/format and mypy passed.
 APXMIDP missing for curtailed periods 29–39. Command exited 0 and printed all
 three required views.
 
-Next up: M7 pydantic-validated exports, completeness guard, workflow, and README.
+Next up: M7 local export acceptance, workflow YAML/actionlint validation, then
+all final repository gates.

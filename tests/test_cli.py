@@ -43,3 +43,15 @@ def test_date_and_range_are_mutually_exclusive() -> None:
 
     assert result.exit_code == 2
     assert "exactly one" in result.stderr
+
+
+def test_export_summary_strict_mode_exits_one_on_gap(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("tracker.cli.DATABASE_PATH", tmp_path / "tracker.duckdb")
+    monkeypatch.setattr("tracker.cli.OUTPUT_DIR", tmp_path / "out")
+    monkeypatch.setattr("tracker.cli.today_in_london", lambda: date(2026, 1, 4))
+
+    result = CliRunner().invoke(app, ["export-summary"])
+
+    assert result.exit_code == 1
+    assert "2026-01-01" in result.stderr
+    assert "2026-01-02" in result.stderr

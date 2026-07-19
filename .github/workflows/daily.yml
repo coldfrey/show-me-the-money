@@ -1,0 +1,84 @@
+name: Daily constraint tracker
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      RCLONE_CONFIG_R2_ACL: private
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Check R2 credentials
+        id: check
+        env:
+          ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          if [[ -n "$ACCOUNT_ID" && -n "$ACCESS_KEY_ID" && -n "$SECRET_ACCESS_KEY" ]]; then
+            echo "has_r2=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_r2=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::R2 secrets are missing; running compute-only without restore or publish"
+          fi
+
+      - name: Restore raw cache
+        if: steps.check.outputs.has_r2 == 'true'
+        run: rclone copy r2:constraint-tracker/state/raw raw/
+
+      - name: Restore DuckDB
+        if: steps.check.outputs.has_r2 == 'true'
+        run: |
+          mkdir -p data
+          rclone copy r2:constraint-tracker/state/tracker.duckdb data/
+
+      - name: Backfill missing dates
+        run: uv run tracker backfill
+
+      - name: Refresh trailing revision window
+        run: |
+          REFRESH_FROM=$(uv run python -c 'from datetime import timedelta; from tracker.cli import today_in_london; from tracker.config import EARLIEST_DATE; print(max(EARLIEST_DATE, today_in_london()-timedelta(days=8)))')
+          REFRESH_TO=$(uv run python -c 'from datetime import timedelta; from tracker.cli import today_in_london; print(today_in_london()-timedelta(days=2))')
+          uv run tracker ingest --from "$REFRESH_FROM" --to "$REFRESH_TO" --refresh
+
+      - name: Export daily files and strict summary
+        run: |
+          EXPORT_FROM=$(uv run python -c 'from tracker.config import EARLIEST_DATE; print(EARLIEST_DATE)')
+          EXPORT_TO=$(uv run python -c 'from datetime import timedelta; from tracker.cli import today_in_london; print(today_in_london()-timedelta(days=2))')
+          uv run tracker export --from "$EXPORT_FROM" --to "$EXPORT_TO"
+          uv run tracker export-summary
+
+      - name: Persist raw cache
+        if: steps.check.outputs.has_r2 == 'true'
+        run: rclone copy raw/ r2:constraint-tracker/state/raw/
+
+      - name: Persist DuckDB
+        if: steps.check.outputs.has_r2 == 'true'
+        run: rclone copy data/tracker.duckdb r2:constraint-tracker/state/
+
+      - name: Publish JSON
+        if: steps.check.outputs.has_r2 == 'true'
+        run: rclone copy out/ r2:constraint-tracker/

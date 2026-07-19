@@ -351,6 +351,15 @@ class TrackerStore:
             ).fetchall()
         ]
 
+    def daily_result_dates(self, start: date, end: date) -> list[date]:
+        return [
+            row[0]
+            for row in self.connection.execute(
+                "SELECT date FROM daily_results WHERE date BETWEEN ? AND ? ORDER BY date",
+                [start, end],
+            ).fetchall()
+        ]
+
     def replace_attributions(
         self,
         settlement_date: date,
@@ -450,3 +459,28 @@ class TrackerStore:
         ).fetchone()
         assert row is not None
         return MonthlyAggregate(*(float(value) for value in row))
+
+    def daily_aggregate(self, start: date, end: date) -> MonthlyAggregate:
+        row = self.connection.execute(
+            """
+            SELECT coalesce(sum(curtailment_cost), 0),
+                   coalesce(sum(curtailment_volume), 0),
+                   coalesce(sum(turnup_cost), 0),
+                   coalesce(sum(turnup_volume), 0)
+            FROM daily_results WHERE date BETWEEN ? AND ?
+            """,
+            [start, end],
+        ).fetchone()
+        assert row is not None
+        return MonthlyAggregate(*(float(value) for value in row))
+
+    def so_payments_total(self, start: date, end: date) -> float:
+        row = self.connection.execute(
+            """
+            SELECT coalesce(sum(cost_gbp), 0) FROM turnup_by_bmu
+            WHERE date BETWEEN ? AND ?
+            """,
+            [start, end],
+        ).fetchone()
+        assert row is not None
+        return float(row[0])

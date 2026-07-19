@@ -10,6 +10,7 @@ import typer
 from tracker.api import ElexonClient
 from tracker.config import EARLIEST_DATE
 from tracker.crosscheck import run_crosscheck
+from tracker.export import MissingDatesError, export_dates, export_summary
 from tracker.ingest import ingest_dates, recompute_stored_dates, refresh_reference
 from tracker.owners import aggregate_leaderboard, load_owners, seed_owners
 from tracker.store import TrackerStore
@@ -20,6 +21,7 @@ RAW_DIR = Path("raw")
 DATABASE_PATH = Path("data/tracker.duckdb")
 WAIVER_PATH = Path("validation/waivers.yml")
 OWNERS_PATH = Path("data/owners.csv")
+OUTPUT_DIR = Path("out")
 
 
 @app.callback()
@@ -181,6 +183,64 @@ def crosscheck(settlement_date: str = typer.Option(..., "--date")) -> None:
         f"MID alternative: £{result.mid_estimate_gbp:.6f}; "
         f"missing APXMIDP periods={missing}"
     )
+
+
+@app.command("export")
+def export_command(
+    settlement_date: str | None = typer.Option(None, "--date"),
+    from_date: str | None = typer.Option(None, "--from"),
+    to_date: str | None = typer.Option(None, "--to"),
+) -> None:
+    """Write validated daily JSON exports."""
+    dates = resolve_date_range(settlement_date, from_date, to_date)
+    try:
+        with TrackerStore(DATABASE_PATH) as store:
+            paths = export_dates(store, dates, OUTPUT_DIR, OWNERS_PATH)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Wrote {len(paths)} daily exports")
+
+
+@app.command("export-summary")
+def export_summary_command(
+    allow_missing: bool = typer.Option(False, "--allow-missing"),
+) -> None:
+    """Write the validated current-year summary JSON."""
+    try:
+        with TrackerStore(DATABASE_PATH) as store:
+            path, missing = export_summary(
+                store,
+                OUTPUT_DIR,
+                today_in_london(),
+                allow_missing=allow_missing,
+            )
+    except MissingDatesError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    if missing:
+        typer.echo(
+            "WARNING: summary has missing dates: "
+            + ", ".join(day.isoformat() for day in missing),
+            err=True,
+        )
+    typer.echo(f"Wrote {path}")
+
+
+@app.command()
+def backfill() -> None:
+    """Ingest every missing supported date through today minus two days."""
+    latest = today_in_london() - timedelta(days=2)
+    dates = [
+        EARLIEST_DATE + timedelta(days=offset)
+        for offset in range((latest - EARLIEST_DATE).days + 1)
+    ]
+    with TrackerStore(DATABASE_PATH) as store:
+        stored = set(store.daily_result_dates(EARLIEST_DATE, latest))
+    missing = [day for day in dates if day not in stored]
+    if missing:
+        with ElexonClient(RAW_DIR) as client, TrackerStore(DATABASE_PATH) as store:
+            ingest_dates(client, store, missing)
+    typer.echo(f"Backfilled {len(missing)} missing dates")
 
 
 def resolve_date_range(
