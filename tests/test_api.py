@@ -71,6 +71,21 @@ def test_stack_404_is_cached_as_empty(tmp_path) -> None:
     assert request_count == 1
 
 
+def test_ebocf_period_404_is_cached_as_empty(tmp_path) -> None:
+    request_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(404, json={"detail": "missing"})
+
+    path = "/balancing/settlement/indicative/cashflows/all/bid/2026-07-10/49"
+    with ElexonClient(tmp_path, httpx.MockTransport(handler)) as client:
+        assert client.get(path) == {"data": []}
+        assert client.get(path) == {"data": []}
+    assert request_count == 1
+
+
 def test_synthetic_stack_item_allows_null_identifiers(tmp_path) -> None:
     item = stack_item(1)
     item["acceptanceId"] = None

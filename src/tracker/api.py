@@ -117,7 +117,14 @@ class ElexonClient:
             return self._read_cache(cache_path)
 
         response = self._request_with_retries(url, params)
-        if response.status_code == 404 and "/balancing/settlement/stack/all/" in url:
+        normal_empty_paths = (
+            "/balancing/settlement/stack/all/",
+            "/balancing/settlement/acceptance/volumes/all/",
+            "/balancing/settlement/indicative/cashflows/all/",
+        )
+        if response.status_code == 404 and any(
+            path in url for path in normal_empty_paths
+        ):
             data: JsonValue = {"data": []}
         else:
             response.raise_for_status()

@@ -9,6 +9,7 @@ import typer
 
 from tracker.api import ElexonClient
 from tracker.config import EARLIEST_DATE
+from tracker.crosscheck import run_crosscheck
 from tracker.ingest import ingest_dates, recompute_stored_dates, refresh_reference
 from tracker.owners import aggregate_leaderboard, load_owners, seed_owners
 from tracker.store import TrackerStore
@@ -157,6 +158,29 @@ def leaderboard(
     for row in output:
         name = row.get("parent_company", row.get("station_name"))
         typer.echo(f"{name}: £{row['cost_gbp']:.2f}, {row['volume_mwh']:.2f} MWh")
+
+
+@app.command()
+def crosscheck(settlement_date: str = typer.Option(..., "--date")) -> None:
+    """Print EBOCF and MID alternatives beside our curtailment result."""
+    requested_date = resolve_date_range(settlement_date, None, None)[0]
+    try:
+        with ElexonClient(RAW_DIR) as client, TrackerStore(DATABASE_PATH) as store:
+            result = run_crosscheck(client, store, requested_date)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    sign = "negative" if result.ebocf_wind_gbp < 0 else "non-negative"
+    flag = "FLAG >25%" if result.ebocf_flagged else "PASS <=25%"
+    typer.echo(f"Our curtailment: £{result.our_curtailment_gbp:.6f}")
+    typer.echo(
+        f"EBOCF wind-side: £{result.ebocf_wind_gbp:.6f} ({sign}), "
+        f"delta={result.ebocf_deviation_pct:.6f}% {flag}"
+    )
+    missing = ",".join(str(period) for period in result.missing_mid_periods) or "none"
+    typer.echo(
+        f"MID alternative: £{result.mid_estimate_gbp:.6f}; "
+        f"missing APXMIDP periods={missing}"
+    )
 
 
 def resolve_date_range(
