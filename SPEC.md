@@ -78,7 +78,7 @@ Base: `https://data.elexon.co.uk/bmrs/api/v1`
 - **Retries:** up to 3 retries (4 attempts total) on: HTTP 5xx, HTTP 429, timeouts, connection errors. Backoff before retry n = 1 s, 2 s, 4 s; for 429, sleep `max(backoff, Retry-After header)` if the header is present. 4xx other than 429 is not retried.
 - **404 on settlement-stack and BOAV/EBOCF period endpoints is normal** (period doesn't exist that day): treat as empty (`{"data": []}`) and cache that. 404 elsewhere is an error.
 - **Disk cache:** canonical cache key = `{host}{path}?{query params sorted by key, k=v joined with &}`. File path: `raw/{host}/{path with "/" → "__"}{"?" + sorted query if any, with "/" and ":" percent-encoded}.json`; if the resulting filename exceeds 180 chars, replace it with `sha256(canonical_key).hexdigest() + ".json"` in the same directory. Writes are atomic (write `*.tmp`, then `os.replace`). A cache hit makes zero HTTP attempts. `refresh=True` bypasses the cache for reads and overwrites it on success (never deletes on failure).
-- The wastedwind summary response changes over time → its cache key additionally includes the **fetch date**: `raw/wastedwind/summary-{year}-{today}.json`. A same-day file is a hit; otherwise fetch.
+- **Named cache-path exceptions** (override the canonical rule, same atomic-write semantics): BMU reference → `raw/reference/bmunits.json`; wastedwind summary → `raw/wastedwind/summary-{year}-{today}.json` (the response changes over time, so the key includes the **fetch date**; a same-day file is a hit, otherwise fetch).
 
 ### 3.1 Settlement stack — THE primary dataset (both phases)
 
@@ -108,7 +108,7 @@ GET /balancing/settlement/stack/all/offer/{settlementDate}/{settlementPeriod}
 - `id` is the **Elexon BMU id** (joins to `elexonBmUnit` in reference data). Bid volumes are negative (MWh); offer volumes positive. `cadlFlag` may be `null` on offers — treat `null` as `false`. Prices are £/MWh.
 - This dataset is settlement-derived: acceptance supersession, deduplication, and volume integration are **already done by Elexon**. We do NOT reimplement them.
 
-**`StackItem` pydantic model** (`extra="ignore"`): `settlementDate: date`, `settlementPeriod: int`, `startTime: datetime`, `sequenceNumber: int`, `id: str`, `acceptanceId: int`, `bidOfferPairId: int`, `cadlFlag: bool | None`, `soFlag: bool`, `originalPrice: float`, `finalPrice: float | None`, `volume: float`, `transmissionLossMultiplier: float | None`. (Remaining §3.1 fields optional `float | None`; not used in calculations.)
+**`StackItem` pydantic model** (`extra="ignore"`): `settlementDate: date`, `settlementPeriod: int`, `startTime: datetime`, `sequenceNumber: int`, `id: str`, `acceptanceId: int`, `bidOfferPairId: int`, `cadlFlag: bool | None`, `soFlag: bool`, `originalPrice: float`, `finalPrice: float | None`, `volume: float`, `transmissionLossMultiplier: float | None`, `createdDateTime: datetime | None`, `storProviderFlag: bool | None`, `repricedIndicator: bool | None`, `reserveScarcityPrice: float | None`, `dmatAdjustedVolume: float | None`, `arbitrageAdjustedVolume: float | None`, `nivAdjustedVolume: float | None`, `parAdjustedVolume: float | None`, `tlmAdjustedVolume: float | None`, `tlmAdjustedCost: float | None`. (Fields after `transmissionLossMultiplier` are stored but unused in calculations.)
 
 ### 3.2 BMU reference data
 
@@ -159,7 +159,7 @@ Verified response shape:
            "bidCost": 13746022.75, "bidCostM": 13.75, "turnUpVolume": 348067.73,
            "turnUpVolumeGWh": 348.07, "turnUpCost": 49897452.53, "turnUpCostM": 49.90}]}
 ```
-One `data` element per month, **current month included and partial** (rolling). `bidCost` = curtailment £, `turnUpCost` = replacement £. Models: `WastedWindMonth` (`year: int, month: int, bidVolumeMWh: float, bidCost: float, turnUpVolume: float, turnUpCost: float`, extras ignored) and `WastedWindSummary` (`total: dict, data: list[WastedWindMonth]`). **No HTML scraping anywhere** (the site is client-rendered; scraping was never viable).
+One `data` element per month, **current month included and partial** (rolling). `bidCost` = curtailment £, `turnUpCost` = replacement £. Models (all `extra="ignore"`): `WastedWindTotal` (`bidCost: float, offerCost: float, totalCost: float, volume: float`), `WastedWindMonth` (`year: int, month: int, bidVolumeMWh: float, bidCost: float, turnUpVolume: float, turnUpCost: float`), `WastedWindSummary` (`total: WastedWindTotal, data: list[WastedWindMonth]`). **No HTML scraping anywhere** (the site is client-rendered; scraping was never viable).
 
 Note: the summary reflects whatever data revisions existed when the site's cron computed it; small drift vs a fresh computation is expected and is why the tolerance is ±2%, not 0.
 
@@ -219,7 +219,7 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
 
 ### Milestone 1 — API client + raw cache
 - `api.py`: `ElexonClient` implementing §3.0 exactly (pacing incl. retries, retry policy incl. 429/Retry-After, atomic cache writes, canonical cache keys, stack-404-as-empty). Constructor takes `cache_dir: Path` and optional `transport` (for httpx MockTransport in tests).
-- Methods: `bid_stack(date, period)`, `offer_stack(date, period)`, `bmunits()`, `wastedwind_summary(year)`, generic `get(path, params, refresh=False)`. All return parsed pydantic models (`list[StackItem]`, `list[BmuRef]`, `WastedWindSummary`).
+- Methods: `bid_stack(date, period, refresh=False)`, `offer_stack(date, period, refresh=False)`, `bmunits(refresh=False)`, `wastedwind_summary(year)` — these return parsed pydantic models (`list[StackItem]`, `list[BmuRef]`, `WastedWindSummary`). Generic `get(path, params, refresh=False)` returns **decoded JSON** (`dict | list`) and is the raw layer the typed wrappers (and M6's EBOCF/MID/BOAV calls) sit on.
 - `models.py`: `StackItem`, `BmuRef`, `WastedWindMonth`, `WastedWindSummary` per §3 with `model_config = ConfigDict(extra="ignore")`.
 - CLI: `tracker fetch --date 2026-07-10` pulls both stacks for periods 1..50 into `raw/` (100 requests worst case).
 - Tests (`test_api.py`, mock transport + `tmp_path` cache dir, no live calls): first pass over a mocked date makes exactly 100 requests; second pass with the same client+cache makes exactly 0 (count via the mock transport); 404 stack response cached as empty and parsed as `[]`; 429 with `Retry-After: 1` retried; ≥0.25 s spacing enforced between attempt timestamps (record attempt times in the mock; allow generous upper bounds so the test isn't flaky); cache filenames deterministic for permuted param order.
@@ -236,8 +236,8 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
   - `bmu_ref` (all §3.2 model fields, PK `elexonBmUnit`),
   - `daily_results` (`date` PK, `curtailment_cost, curtailment_volume, turnup_cost, turnup_volume, total_cost` DOUBLE, `computed_at` TIMESTAMP).
   - Per-date replace is transactional: `BEGIN; DELETE ... WHERE settlementDate = ?; INSERT ...; COMMIT;`.
-- CLI date arguments: every ingest-family command takes **exactly one of** `--date D` **or** `--from A --to B` (both required together, inclusive range, `A ≤ B`); anything else is a usage error. Dates outside `[EARLIEST_DATE, today−1]` (Europe/London) → error before any HTTP.
-- `tracker ingest`: fetch (cache-aware) → upsert `stack_items` → compute §4 → upsert `daily_results`. Flags: `--refresh` (bypass+overwrite raw cache for the requested dates), `--refresh-reference` (refetch BMU reference; usable with or without dates).
+- CLI date arguments: every ingest-family command takes **exactly one of** `--date D` **or** `--from A --to B` (both required together, inclusive range, `A ≤ B`); anything else is a usage error. Dates outside `[EARLIEST_DATE, today−1]` (Europe/London) → error before any HTTP. Exception: `tracker ingest --refresh-reference` with **no** date arguments is valid and refreshes only the BMU reference.
+- `tracker ingest`: fetch (cache-aware) → upsert `stack_items` → compute §4 → upsert `daily_results`. Flags: `--refresh` (bypass+overwrite raw cache for the requested dates), `--refresh-reference` (refetch BMU reference).
 - `tracker show --date D` prints the day's `daily_results` row.
 - **Idempotency definition:** re-running `ingest` for a date without `--refresh` must reproduce byte-identical values for the five calculated columns and identical `stack_items` row counts; `computed_at` is excluded from the comparison.
 - **Accept:** `uv run tracker ingest --date 2026-07-10 && uv run tracker show --date 2026-07-10` prints nonzero curtailment; running ingest twice and diffing the five values proves idempotency (make this a test using cached fixtures); `test_store.py` passes; a test proves pre-`EARLIEST_DATE` and future dates are rejected.
@@ -245,13 +245,13 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
 ### Milestone 4 — Validation harness
 - `tracker validate --year Y [--month M]`: considers only **complete months** entirely within `[EARLIEST_DATE, today−2]` (Europe/London). `--month` naming an incomplete/out-of-range month → error listing eligible months. For each eligible month: ingest all days (cache-aware), aggregate, fetch `/api/summary/{Y}`, compare all four metrics: `bidCost`, `bidVolumeMWh`, `turnUpCost`, `turnUpVolume`.
 - **Deviation:** `Δ% = |ours − theirs| / |theirs| × 100`; if `theirs == 0`: `Δ% = 0` when `ours == 0`, else the metric fails outright.
-- **Exit status:** exit 1 if any compared metric of any compared month exceeds **2%**, unless waived. A waiver is an entry in `validation/waivers.yml` (`{year, month, metric, observed_pct, reason}`); waived metrics print `WAIVED (reason)` and do not affect exit status. Waivers may only be added after the investigation procedure below, and each must be mirrored by a dated explanation in `METHODOLOGY.md` § Validation results.
+- **Exit status:** exit 1 if any compared metric of any compared month exceeds **2%**, unless waived. A waiver is an entry in `validation/waivers.yml` (`{year, month, metric, observed_pct, reason}`), matched on **`(year, month, metric)` only**; `observed_pct` is documentary (the Δ% at waiver time — validate always prints the *current* Δ% alongside `WAIVED (reason)`). Waived metrics do not affect exit status. Waivers may only be added after the investigation procedure below, and each must be mirrored by a dated explanation in `METHODOLOGY.md` § Validation results.
 - Investigation procedure for >2%: (1) re-fetch a sample day with `--refresh` and diff (data revisions); (2) compare fuel-type lookups for the BMUs involved (site's static list vs live reference); (3) re-read the implementation against §4 line by line. If still unexplained → STOP per AGENTS.md (write `BLOCKED.md`). Never proceed with an unexplained deviation.
 - Request volume note: a 30-day month is ≤ 3,000 stack requests ≈ 13 min at 4 req/s — expected, fine, cached forever after.
 - **Accept:** `uv run tracker validate --year 2026 --month 6` exits 0 AND `uv run tracker validate --year 2026 --month 5` exits 0 (waivers permitted per above); `METHODOLOGY.md` § Validation results records the actual observed Δ% table for both months.
 
 ### Milestone 5 — Phase B: follow the money
-- `turnup.py` (pure): from a day's **offer** stack, select `soFlag == True` items (constraint turn-ups; **no cadlFlag filter here** — document), group by `id`: per-BMU `volume_mwh = Σ volume`, `cost_gbp = Σ originalPrice × volume`. Wind side, from the **bid** stack: select `fuelType == "WIND" and soFlag`, group by `id`: `volume_mwh = abs(Σ volume)`, `cost_gbp = Σ originalPrice × volume`.
+- `turnup.py` (pure) — both functions take `(items: list[StackItem], fuel_lookup: dict[str, str | None])` (same `fuel_lookup` contract as §4 Step 2; `StackItem` itself has no fuelType field): `so_offer_payments(offer_items, fuel_lookup)` selects `soFlag == True` items (constraint turn-ups; **no cadlFlag filter here** — document), groups by `id`: per-BMU `volume_mwh = Σ volume`, `cost_gbp = Σ originalPrice × volume`. `so_wind_curtailment(bid_items, fuel_lookup)` selects `fuel_lookup[id] == "WIND" and soFlag`, groups by `id`: `volume_mwh = abs(Σ volume)`, `cost_gbp = Σ originalPrice × volume`.
 - `store.py` additions — tables `turnup_by_bmu` and `curtailment_by_bmu`, identical schema: `(date, bmu_id)` PK, `national_grid_bmu_id, station_name, lead_party_id, lead_party_name, fuel_type, volume_mwh DOUBLE, cost_gbp DOUBLE`. Reference fields resolved via `bmu_ref` at compute time; unknown BMU ⇒ name/party fields NULL, `fuel_type` NULL. Per-date transactional delete-and-replace, same as `stack_items`.
 - `ingest` now also computes+upserts both attribution tables. `tracker recompute --from A --to B`: recompute `daily_results` + both attribution tables from `stack_items` already in DuckDB — **zero HTTP**. After implementing, run `recompute` over every date already ingested (backfill).
 - `owners.py` + `data/owners.csv` (columns: `lead_party_id, lead_party_name, parent_company, notes`). Seed deterministically: query `turnup_by_bmu` over **2026-05-01..2026-06-30** (already ingested during M4 — zero new HTTP), rank lead parties by Σ cost_gbp, take top 30; assign `parent_company` from the §7.1 table where `lead_party_name` matches (case-insensitive substring); otherwise `parent_company = lead_party_name`, `notes = "unverified"`.
@@ -261,7 +261,7 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
 ### Milestone 6 — Cross-checks (optional; bounded — must not block M7)
 - `tracker crosscheck --date D` prints three views:
   1. Our curtailment £ (from `daily_results`).
-  2. EBOCF wind-side: Σ over bid-flow EBOCF rows where `bmUnit` maps to fuelType WIND of `Σ_k coalesce(bidOfferPairCashflows.negativeK, 0)` for k=1..6. Compare magnitudes: `Δ% = ||EBOCF_sum| − |ours|| / |ours| × 100`; flag `> 25%`. (Sign convention of EBOCF cashflows is not pre-verified — record the observed sign in METHODOLOGY.md on first run; only magnitudes are compared.)
+  2. EBOCF wind-side: Σ over bid-flow EBOCF rows where `bmUnit` maps to fuelType WIND of `Σ_k coalesce(bidOfferPairCashflows.negativeK, 0)` for k=1..6. Compare magnitudes: `Δ% = ||EBOCF_sum| − |ours|| / |ours| × 100`; flag `> 25%`. Zero cases: both zero ⇒ 0%; ours zero with EBOCF nonzero ⇒ flag. (Sign convention of EBOCF cashflows is not pre-verified — record the observed sign in METHODOLOGY.md on first run; only magnitudes are compared.)
   3. MID alternative estimate: `Σ_p abs(period_curtailed[p]) × price(APXMIDP, p)` using `MID?from=D&to=D`; periods missing an APXMIDP row are skipped and logged.
 - **Skip policy:** if acceptance fails after 3 distinct fix attempts, append `M6 SKIPPED: <detailed reason>` to `PROGRESS.md` and proceed to M7. M6 can never appear in `BLOCKED.md`.
 - **Accept:** `uv run tracker crosscheck --date 2026-07-10` exits 0 and prints all three views (or the skip entry exists).
@@ -270,16 +270,17 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
 - `export.py`:
   - `tracker export --date D` (or `--from/--to`) → `out/daily/YYYY-MM-DD.json` per the frozen schema in §8. Top-lists: `top_bmus` = top 10 from `curtailment_by_bmu` by `cost_gbp` desc; `top_companies` = top 10 company aggregates from `turnup_by_bmu` (owner join as in leaderboard).
   - `tracker export-summary` → `out/summary.json` (§8): **current Europe/London calendar year**, one element per month from January through the current month (current month flagged `"partial": true`, computed over days ≤ today−2), plus year-to-date totals.
-  - Both validated by pydantic models before writing; tests round-trip the schemas.
+  - **Completeness guard:** by default `export-summary` exits 1 listing any date in `[max(EARLIEST_DATE, Jan 1), today−2]` missing from `daily_results` — an incomplete year must never be silently published. `--allow-missing` computes over available dates anyway, marks every month with missing days `"partial": true`, and prints a warning (used for local acceptance so M7 doesn't require a multi-hour full-year backfill; the workflow uses strict mode after its backfill step).
+  - Both commands validate output with pydantic models before writing; tests round-trip the schemas.
 - GitHub Actions `.github/workflows/daily.yml`, cron `30 6 * * *` (06:30 UTC):
-  1. `uv sync`.
-  2. **Restore state:** `rclone sync r2:constraint-tracker/state/raw raw/` and copy `state/tracker.duckdb` down (if remote exists).
-  3. **Backfill:** ingest any dates in `[EARLIEST_DATE, today−2]` missing from `daily_results` (cache-aware — after restore this is normally nothing).
-  4. **Refresh window:** one inclusive re-ingest `--refresh` of `[today−8, today−2]` (data revises for ~7 days).
-  5. Export dailies for the refresh window + `export-summary` (once).
-  6. **Persist state + publish:** upload `raw/`, `data/tracker.duckdb` to `r2:constraint-tracker/state/`, and `out/` to `r2:constraint-tracker/` (`daily/`, `summary.json`).
+  1. **Prepare:** `actions/checkout`, install uv (`astral-sh/setup-uv`), `uv sync`, install rclone (`curl https://rclone.org/install.sh | sudo bash` or apt).
+  2. **Restore state (non-destructive):** `rclone copy r2:constraint-tracker/state/raw raw/` and `rclone copy r2:constraint-tracker/state/tracker.duckdb data/` (if remote exists). Never `sync` toward local — the local cache must not lose files.
+  3. **Backfill:** ingest any dates in `[EARLIEST_DATE, today−2]` missing from `daily_results` (cache-aware — after restore this is normally nothing; the first-ever run does the full year here).
+  4. **Refresh window:** one inclusive re-ingest `--refresh` of `[max(EARLIEST_DATE, today−8), today−2]` (data revises for ~7 days).
+  5. **Export:** dailies for the refresh window **and every date the backfill ingested**, then `export-summary` (strict mode, once).
+  6. **Persist state + publish (non-destructive):** `rclone copy` `raw/` and `data/tracker.duckdb` to `r2:constraint-tracker/state/`, and `rclone copy out/` to `r2:constraint-tracker/` (`daily/`, `summary.json`). Always `copy`, never `sync` — a fresh runner must not delete historical remote files.
   - Upload tool is **rclone** with S3-compatible env config from secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (endpoint `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`). A first step exports `has_r2=true/false` (secret presence check via env indirection); all rclone steps have `if: steps.check.outputs.has_r2 == 'true'`. **Missing secrets ⇒ rclone steps skipped, workflow still succeeds** (compute-only run) with a visible warning annotation. This milestone's acceptance is entirely local — credentials are NOT required to complete it.
-- **Accept:** `uv run tracker export --date 2026-07-10` writes JSON matching §8 (pydantic-validated in tests, incl. list limits and ordering); `uv run tracker export-summary` writes valid `out/summary.json`; workflow YAML parses (`python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/daily.yml'))"`) and passes `actionlint` if installed (else skip); README documents the three secrets and the R2 layout.
+- **Accept:** `uv run tracker export --date 2026-07-10` writes JSON matching §8 (pydantic-validated in tests, incl. list limits and ordering); `uv run tracker export-summary --allow-missing` writes valid `out/summary.json`; a test proves strict mode exits 1 on a gap; workflow YAML parses (`python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/daily.yml'))"`) and passes `actionlint` if installed (else skip); README documents the three secrets and the R2 layout.
 
 ---
 
@@ -305,7 +306,7 @@ Work strictly in order (M6 has an explicit skip policy). Per-task and per-milest
 8. Negative-priced offers / positive-priced bids (batteries etc.) are **included as-is** in replication (the site doesn't filter them); Phase B tables may show them — that's a feature (batteries earning is part of the story).
 9. **Two turn-up measures, never conflated:** `replacement_cost` (§4 walk — feeds `total_cost` and matches wastedwind) and `so_flagged_payments` (Phase B gross £ to SO-flagged offer BMUs — feeds league tables).
 
-### 7.1 Owner seed table (case-insensitive substring match on lead_party_name)
+### 7.1 Owner seed table (case-insensitive substring match on lead_party_name; **table order = precedence, first match wins**; comma-separated substrings are alternatives for the same row)
 
 | Match substring | parent_company |
 |---|---|
@@ -366,7 +367,7 @@ All field names snake_case, money GBP floats, volumes MWh floats. `methodology_v
   "total_cost_gbp": 0.0
 }
 ```
-- `top_bmus`: top 10 by `cost_gbp` desc from `curtailment_by_bmu`. `top_companies`: top 10 company aggregates by `cost_gbp` desc from `turnup_by_bmu` (SO-flagged payments measure). `total_cost_gbp = curtailment.cost_gbp + turnup.replacement_cost_gbp` (the wastedwind-comparable headline).
+- `top_bmus`: top 10 by `cost_gbp` desc from `curtailment_by_bmu`. `top_companies`: top 10 company aggregates by `cost_gbp` desc from `turnup_by_bmu` (SO-flagged payments measure). Deterministic ordering: ties broken by `bmu_id` / `parent_company` ascending. No nulls in exports: NULL `station_name`/`lead_party_name` ⇒ substitute the `bmu_id`; NULL `parent_company` ⇒ substitute `lead_party_name` (or `bmu_id`); NULL `fuel_type` ⇒ `"UNKNOWN"`. `fuel_types` = sorted unique fuel types of the company's contributing BMUs. `total_cost_gbp = curtailment.cost_gbp + turnup.replacement_cost_gbp` (the wastedwind-comparable headline).
 
 `out/summary.json` — current Europe/London calendar year:
 ```json

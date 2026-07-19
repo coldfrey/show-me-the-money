@@ -43,5 +43,5 @@ uv run tracker validate --year 2026 --month 6
 uv run tracker validate --year 2026 --month 5
 uv run tracker leaderboard --from 2026-06-01 --to 2026-06-30 --side turnup --by company --json
 uv run tracker crosscheck --date 2026-07-10
-uv run tracker export --date 2026-07-10 && uv run tracker export-summary
+uv run tracker export --date 2026-07-10 && uv run tracker export-summary --allow-missing
 ```
