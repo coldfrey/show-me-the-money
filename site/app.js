@@ -167,10 +167,17 @@ function wireNav() {
 }
 
 /* ---------- boot ---------- */
-(async function boot() {
+function setMastheadDate() {
   byId("masthead-date").textContent = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
   });
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  setTimeout(setMastheadDate, midnight - now + 1000);
+}
+
+(async function boot() {
+  setMastheadDate();
   wireNav();
   try {
     const summary = await fetchJSON("data/summary.json");
