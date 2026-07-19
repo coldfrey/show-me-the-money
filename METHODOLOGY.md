@@ -71,3 +71,11 @@ aggregates compared with the same-day wastedwind.energy summary API.
 | 2026-06 | bidVolumeMWh | 605,943.025167 | 605,943.025167 | 0.000000% |
 | 2026-06 | turnUpCost | 89,558,881.516572 | 89,576,953.407854 | 0.020175% |
 | 2026-06 | turnUpVolume | 600,075.795330 | 600,075.795330 | 0.000000% |
+
+### 2026-07-19 — optional EBOCF/MID cross-check
+
+For 2026-07-10, EBOCF wind-side cashflows summed to a **positive**
+£986.573355. Magnitudes differed from the primary £1,023.581667 curtailment
+result by 3.615570%, inside the 25% sanity threshold. The MID response had no
+APXMIDP price for curtailed periods 29–39, so those periods were logged and the
+skipped-period alternative was £0 as specified.

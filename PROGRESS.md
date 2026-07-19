@@ -18,6 +18,7 @@
 [x] M5: backfill all stored attribution, seed top-30 owners, and accept leaderboard
 [x] M6: EBOCF wind cashflow and APXMIDP alternative cross-check implementation
 [x] M6: period-404, sign/magnitude, zero-case, and missing-MID tests
+[x] M6: live 2026-07-10 cross-check and observed-sign record
 
 2026-07-19 — M0 complete: `uv run tracker --help` exited 0; pytest collected
 and passed 1 test; ruff check/format and mypy all passed.
@@ -47,4 +48,9 @@ cached for offline reproduction.
 Seabank Power Limited. Five attribution tests and full 35-test suite passed;
 ruff check/format and mypy passed.
 
-Next up: M6 live cross-check for 2026-07-10 and observed EBOCF sign record.
+2026-07-19 — M6 complete on first attempt: ours £1,023.581667; EBOCF
++£986.573355 (positive sign), magnitude delta 3.615570% PASS; MID £0 with
+APXMIDP missing for curtailed periods 29–39. Command exited 0 and printed all
+three required views.
+
+Next up: M7 pydantic-validated exports, completeness guard, workflow, and README.
