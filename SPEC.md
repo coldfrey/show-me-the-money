@@ -1,6 +1,6 @@
 # Show Me The Money — Constraint Cost Tracker: Implementation Spec
 
-**Status:** Ready for autonomous implementation. All API endpoints verified live on 2026-07-19. No API keys required. No blockers. Reviewed adversarially by a second model; all findings incorporated (v1.1).
+**Status:** v1.3. M0–M7 implemented and green. All API endpoints verified live on 2026-07-19. No API keys required. No blockers. Amendment §10 (full history + live provisional today) adds milestone M8 — implement it next.
 
 **Audience:** an autonomous coding agent (Codex) implementing this end-to-end. Every task has acceptance criteria and a verification command. When in doubt, follow this spec literally; record any forced deviation in `METHODOLOGY.md` under "Deviations".
 
@@ -397,6 +397,62 @@ R2 layout: `constraint-tracker/daily/YYYY-MM-DD.json`, `constraint-tracker/summa
 - The public website, any HTML/frontend.
 - LCM / bilateral-trade data, embedded wind estimation.
 - Scraping wastedwind HTML pages (client-rendered; the summary API replaces it).
-- Historical backfill before `EARLIEST_DATE` (2026-01-01).
 - Auth of any kind; everything used is open data.
 - Owner-mapping research beyond §7.1.
+
+---
+
+## 10. Amendment v1.3 — full history + live provisional today
+
+This section supersedes any conflicting earlier text. Implement as milestone
+**M8** (loop protocol unchanged: task-by-task, green gates, commit each task,
+record in PROGRESS.md/METHODOLOGY.md). Motivation: the tracker now feeds a
+public site that must (a) show GB constraint history as far back as the data
+allows (wastedwind publishes yearly summaries from 2015) and (b) display a
+live, provisional figure for today, like wastedwind does.
+
+### 10.1 Two distinct date floors (critical)
+
+- `EARLIEST_DATE` becomes `date(2015, 1, 1)` — the **manual-command accept
+  floor** for `fetch`, `ingest`, `show`, `export`, `leaderboard`, `crosscheck`,
+  `validate`. (Elexon serves settlement stacks back to at least 2015; earlier
+  dates simply return sparse/empty stacks and are still accepted.)
+- **The daily-automation floor is NOT `EARLIEST_DATE`.** Introduce a computed
+  `current_year_start()` = `date(today_in_london().year, 1, 1)`. The `backfill`
+  command and `export-summary`'s completeness guard operate over
+  `[current_year_start(), …]`, never `[EARLIEST_DATE, …]`. The scheduled job
+  must never attempt to ingest all of 2015–present on each run. **This is the
+  single most important part of this amendment** — getting it wrong makes the
+  daily workflow try to fetch a decade every night.
+- `validate --year Y` accepts any `Y` with `2015 ≤ Y ≤ today.year`.
+
+### 10.2 Live provisional today
+
+- `fetch`/`ingest` accept `[EARLIEST_DATE, today]` (was `today−1`). Dates
+  `≥ today−1` are **provisional**: always fetched with refresh semantics (cache
+  overwritten, never served stale intraday), because settlement data for the
+  current and prior day is incomplete and revises. Dates `≤ today−2` keep the
+  permanent sacred cache.
+- Future dates (`> today`, Europe/London) remain rejected **before any HTTP**;
+  never requested, never cached (unchanged).
+- Per-day export (§8) gains `"provisional": true` for dates `≥ today−1`, else
+  `false`, so the site can badge live days.
+- `export-summary`: the current month's `partial` figure is computed over days
+  `≤ today` (was `today−2`); still `"partial": true`. `validate` is unchanged —
+  it still restricts to complete months `≤ today−2` (wastedwind itself lags, so
+  fresher comparison is meaningless).
+
+### 10.3 Acceptance (M8)
+
+- `uv run tracker ingest --date <today>` succeeds and re-fetches provisional
+  data on a second run (prove refresh: the two provisional days bypass cache).
+- `uv run tracker ingest --date 2015-06-15 && uv run tracker show --date 2015-06-15`
+  runs without a date-floor error (value may be small/zero — that's fine).
+- A test proves the `backfill` command's missing-date set is bounded by
+  `current_year_start()`, not `EARLIEST_DATE` (e.g. with no data, it targets
+  only the current year, not ~4000 days).
+- A test proves dates `> today` are still rejected before any HTTP.
+- Daily export for a provisional date carries `"provisional": true`; an old
+  date carries `false`.
+- All prior milestones' gates stay green; full `uv run pytest`, `ruff`, `mypy`
+  clean.
