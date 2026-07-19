@@ -130,6 +130,21 @@ body {
   font-size: .72rem; font-weight: 400; color: var(--ink-soft); padding-top: .1rem;
 }
 
+/* ---------- share ---------- */
+.share {
+  display: flex; justify-content: center; gap: .7rem;
+  margin-top: 1.7rem;
+}
+.share a {
+  font-family: var(--mono); font-size: .68rem; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink); text-decoration: none;
+  border: 1.5px solid var(--ink); border-radius: 2px;
+  padding: .55em 1em;
+  transition: background .15s, color .15s;
+}
+.share a:hover { background: var(--ink); color: var(--paper); }
+
 /* ---------- explainer ---------- */
 .explainer {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));

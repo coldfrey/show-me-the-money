@@ -40,6 +40,16 @@ function renderHeadline(summary) {
   byId("methodology-version").textContent = summary.methodology_version;
   byId("generated-at").textContent =
     summary.generated_at === "dev-preview" ? "dev preview build" : "generated " + summary.generated_at;
+
+  const text =
+    `Great Britain has paid ${fmtGBP(summary.totals.total_cost_gbp)} so far in ` +
+    `${summary.year} to turn wind farms off and gas plants on. ` +
+    `One curtailed megawatt-hour, paid for twice.`;
+  const url = location.origin + location.pathname;
+  byId("share-x").href =
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  byId("share-li").href =
+    `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
 }
 
 /* ---------- monthly chart ---------- */
